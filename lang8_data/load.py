@@ -1,6 +1,4 @@
 import json
-import spacy
-import re
 
 id_to_language = dict(enumerate(('Korean', 'English', 'Japanese', 'Mandarin', 'Traditional Chinese',
             'Vietnamese', 'German', 'French', 'Other language', 'Spanish',
@@ -49,33 +47,9 @@ def load_data(filename):
     ]
 
 
-operation_markers = {
-    '[f-red]': '[red]',
-    '[/f-red]': '[red]',
-    '[f-blue]': '[/blue]',
-    '[/f-blue]': '[/blue]',
-    '[sline]': '[strike]',
-    '[/sline]': '[/strike]'
-}
-
-operation_starts = re.compile('|'.join(re.escape(key) for key in operation_markers if '/' not in key) + 'r\s*')
-operation_ends = re.compile(r'\s*' + '|'.join(re.escape(key) for key in operation_markers if '/' in key))
 
 
 
-def preprocess_correction(text):
-    start_iter = operation_starts.finditer(text)
-    end_iter = operation_ends.finditer(text)
-
-    #convert htm tokens to our tokens
-    #any spaces between the html bracketing and the content should end up outside the brackets
-    pass
-
-def update_correction_tokens(correction_doc):
-    pass
-
-def build_correction_parser():
-    pass
 
 
 

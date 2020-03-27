@@ -25,15 +25,18 @@ class TestEnglishNlp(unittest.TestCase):
         self.assertEqual([(x[0].text, x[1]) for x in doc2._.corrections], [])
         self.assertEqual([(x[0].text, x[1]) for x in doc3._.corrections], [('small', '[sline]')])
         self.assertEqual([(x[0].text, x[1]) for x in doc4._.corrections],
-                         [(None, '[f-blue]'), ('could', '[f-blue]')])
-
-
-        print('woogity')
+                         [('would', '[f-blue]'), ('could', '[f-blue]')])
 
 
 
 def main():
-    unittest.main()
+    data = load.load_data('data/chunkfo')
+    learning_english = (ex for ex in data if 'English' in ex.learning_languages)
+    final_data = [ex for ex in learning_english if ex.process()]
+    print('woog')
+#    unittest.main()
+
+
 
 if __name__ == '__main__':
     main()

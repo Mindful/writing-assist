@@ -1,4 +1,4 @@
-import json
+from lang8.example import Example
 
 id_to_language = dict(enumerate(('Korean', 'English', 'Japanese', 'Mandarin', 'Traditional Chinese',
             'Vietnamese', 'German', 'French', 'Other language', 'Spanish',
@@ -15,27 +15,6 @@ id_to_language = dict(enumerate(('Korean', 'English', 'Japanese', 'Mandarin', 'T
                                  'Haitian', 'Slavic')))
 
 language_to_id = {language:id for id, language in id_to_language.items()}
-
-
-class Example:
-    # https://sites.google.com/site/naistlang8corpora/home/readme-raw
-    __slots__ = ['journal_id', 'learning_language', 'native_language', 'sentences', 'corrections']
-
-    def __init__(self, raw_data):
-        json_data = json.loads(raw_data, strict=False)
-        self.journal_id = json_data[0]
-        self.learning_language = json_data[2]
-        self.native_language = json_data[3]
-        self.sentences = json_data[4]
-        self.corrections = [x for x in json_data[5] if x] # discard empty corrections
-
-    def __str__(self):
-        return "(Lang8{} {}: {} -> {})".format(self.__class__.__name__,
-                                               self.journal_id, self.native_language,
-                                               self.learning_language)
-
-    def __repr__(self):
-        return self.__str__()
 
 
 def load_data(filename):

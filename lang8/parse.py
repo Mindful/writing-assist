@@ -10,6 +10,24 @@ operation_markers = {
     '[sline]': '[/sline]',
 }
 
+
+class CorrectionSpan:
+    __slots__ = ['span', 'type', 'content']
+
+    def __init__(self, span, type, content=None):
+        self.span = span
+        self.type = type
+        self.content = content
+
+    def __str__(self):
+        if self.content is None:
+            return '({}, {})'.format(self.span, self.type)
+        else:
+            return '({}, {}, {})'.format(self.span, self.type, self.content)
+
+    def __repr__(self):
+        return self.__str__()
+
 operations_list = list(operation_markers.keys()) + list(operation_markers.values())
 operations_regex = re.compile('(' + '|'.join(re.escape(op) for op in operations_list) + ')')
 Doc.set_extension("corrections", default=[])
@@ -69,7 +87,7 @@ def corrections_tokenizer(tokenizer):
                 if char_location > cor[1] and char_location > cor[2]:
                     break
 
-            doc_corrections.append((doc.char_span(start, end), cor[0]))
+            doc_corrections.append(CorrectionSpan(doc.char_span(start, end), cor[0]))
 
         doc._.corrections = doc_corrections
         return doc

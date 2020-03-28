@@ -1,5 +1,5 @@
 import json
-from lang8.parse import  english_nlp, CorrectionSpan
+from lang8.parse import  english_nlp, MetaSpan
 from langdetect import detect_langs
 from difflib import SequenceMatcher
 from math import log2
@@ -69,12 +69,12 @@ class Example:
                 updates = []
                 for op in aligned_corr[1]:
                     if op[0] == 'replace' or op[0] == 'insert':
-                        updates.append(CorrectionSpan(base_doc[op[1]:op[2]], op[0], aligned_corr[2][op[3]:op[4]]))
+                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0], aligned_corr[2][op[3]:op[4]]))
                     elif op[0] == 'delete':
-                        updates.append(CorrectionSpan(base_doc[op[1]:op[2]], op[0]))
+                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0]))
 
 
-                base_doc._.corrections = base_doc._.corrections + updates
+                base_doc._.meta_spans = base_doc._.meta_spans + updates
 
         return True
 

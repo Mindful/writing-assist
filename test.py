@@ -2,10 +2,19 @@ from lang8 import load, parse
 import unittest
 
 
+class MockSpacySpan:
+    def __init__(self, text):
+        self.text = text
+
+
+def mock_meta_span(text, type, content=None):
+    return parse.MetaSpan(MockSpacySpan(text), type, content)
+
+
 class TestEnglishNlp(unittest.TestCase):
     nlp = parse.english_nlp()
 
-    def test_correction_handling(self):
+    def test_lang8_span_parsing(self):
         str1 = "So, as the winter is coming, I'm [f-blue] really starting [/f-blue] to feel [f-red]better [/f-red]."
         str2 = "I like big dogs."
         str3 = "Will you buy me a [sline]small[/sline] dog?"
@@ -20,21 +29,19 @@ class TestEnglishNlp(unittest.TestCase):
         self.assertEqual(doc3.text, parse.operations_regex.sub('', str3))
         self.assertEqual(doc4.text, parse.operations_regex.sub('', str4))
 
-        self.assertEqual([(x[0].text, x[1]) for x in doc1._.corrections],
-                         [('really starting', '[f-blue]'), ('better', '[f-red]')])
-        self.assertEqual([(x[0].text, x[1]) for x in doc2._.corrections], [])
-        self.assertEqual([(x[0].text, x[1]) for x in doc3._.corrections], [('small', '[sline]')])
-        self.assertEqual([(x[0].text, x[1]) for x in doc4._.corrections],
-                         [('would', '[f-blue]'), ('could', '[f-blue]')])
+        self.assertEqual(doc1._.meta_spans, [mock_meta_span('really starting', '[f-blue]'), mock_meta_span('better', '[f-red]')])
+        self.assertEqual(doc2._.meta_spans, [])
+        self.assertEqual(doc3._.meta_spans, [mock_meta_span('small', '[sline]')])
+        self.assertEqual(doc4._.meta_spans, [mock_meta_span('would', '[f-blue]'), mock_meta_span('could', '[f-blue]')])
 
 
 
 def main():
-    data = load.load_data('data/chunkfo')
-    learning_english = (ex for ex in data if 'English' in ex.learning_languages)
-    final_data = [ex for ex in learning_english if ex.process()]
-    print('woog')
-#    unittest.main()
+    # data = load.load_data('data/chunkfo')
+    # learning_english = (ex for ex in data if 'English' in ex.learning_languages)
+    # final_data = [ex for ex in learning_english if ex.process()]
+    # print('woog')
+   unittest.main()
 
 
 

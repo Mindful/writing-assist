@@ -11,7 +11,7 @@ operation_markers = {
 }
 
 
-class CorrectionSpan:
+class MetaSpan:
     __slots__ = ['span', 'type', 'content']
 
     def __init__(self, span, type, content=None):
@@ -28,9 +28,14 @@ class CorrectionSpan:
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return isinstance(other, MetaSpan) and self.type == other.type and self.span.text == other.span.text \
+               and self.content == other.content
+
+
 operations_list = list(operation_markers.keys()) + list(operation_markers.values())
 operations_regex = re.compile('(' + '|'.join(re.escape(op) for op in operations_list) + ')')
-Doc.set_extension("corrections", default=[])
+Doc.set_extension("meta_spans", default=[])
 
 
 def extract_corrections(text):
@@ -87,9 +92,9 @@ def corrections_tokenizer(tokenizer):
                 if char_location > cor[1] and char_location > cor[2]:
                     break
 
-            doc_corrections.append(CorrectionSpan(doc.char_span(start, end), cor[0]))
+            doc_corrections.append(MetaSpan(doc.char_span(start, end), cor[0]))
 
-        doc._.corrections = doc_corrections
+        doc._.meta_spans = doc_corrections
         return doc
 
     return tokenize

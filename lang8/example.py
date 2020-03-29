@@ -3,14 +3,15 @@ from lang8.parse import  english_nlp, MetaSpan
 from langdetect import detect_langs
 from difflib import SequenceMatcher
 from math import log2
+from languages import *
 
 parsers = {
-    'English': english_nlp()
+    English: english_nlp()
 }
 
-languages = {
-    'en': 'English',
-    'ja': 'Japanese'
+language_by_iso = {
+    'en': English,
+    'ja': Japanese
 }
 
 class Example:
@@ -40,9 +41,9 @@ class Example:
             sentence_text = "\n".join(self.sentences)
             language_probabilities = detect_langs(sentence_text)
             iso = max(language_probabilities, key=lambda x: x.prob).lang
-            if iso not in languages:
+            if iso not in language_by_iso:
                 return False
-            language = languages[iso]
+            language = language_by_iso[iso]
         else:
             language = self.learning_languages[0]
 

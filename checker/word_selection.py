@@ -1,47 +1,72 @@
-from transformers import DistilBertForMaskedLM, DistilBertTokenizer
-from transformers import AutoModelWithLMHead, AutoTokenizer
+from transformers import AutoModelWithLMHead
 from torch import nn
+import torch
 import torch
 import string
 import pprint
+import spacy
+from spacy_transformers import TransformersLanguage, TransformersWordPiecer
+from checker import parts_of_speech
 
 
 class BertWordModel:
+    def set_english_parser(self, bert_model):
+        nlp = TransformersLanguage(trf_name=bert_model, meta={"lang": "en"})
+        nlp.add_pipe(nlp.create_pipe('sentencizer'))
+        wp = TransformersWordPiecer.from_pretrained(nlp.vocab, bert_model)
+        nlp.add_pipe(wp)
+        tagger_nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+        nlp.add_pipe(tagger_nlp.tagger)
+        self.parser = nlp
+        self.vocab = wp.model.vocab
+        self.mask_token_id = self.vocab[wp.model._mask_token]
+        self.ids_to_tokens = wp.model.ids_to_tokens
+
+
     def __init__(self, bert_model):
         self.bert_lm = AutoModelWithLMHead.from_pretrained(bert_model)
-        self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
+        self.set_english_parser(bert_model)
         self.softmax = nn.Softmax(dim=1)
         self.printer = pp = pprint.PrettyPrinter()
 
     def sentence_word_probs(self, sentence):
-        tokens = self.bert_tokenizer.tokenize(sentence)
-        target_indices = [index for index, token in enumerate(tokens) if token not in string.punctuation]
-        token_matrix = [tokens.copy() for _ in target_indices]
-        for i in range(len(target_indices)):
-            token_matrix[i][i] = self.bert_tokenizer.mask_token
+        doc = self.parser(sentence)
+        token_targets = [tok_index for tok_index, token in enumerate(doc) if token.pos in parts_of_speech]
+        targets = [(tok_index, wp_index) for tok_index in token_targets for wp_index in doc._.trf_alignment[tok_index]]
+        wordpiece_targets = [x[1] for x in targets]
 
-        bert_input = self.bert_tokenizer.batch_encode_plus(token_matrix, add_special_tokens=True, return_tensors='pt')
+        input_id_matrix = [doc._.trf_word_pieces.copy() for _ in wordpiece_targets]
+        for i in range(len(wordpiece_targets)):
+            input_id_matrix[i][wordpiece_targets[i]] = self.mask_token_id
+
+        #TODO: this would ideally be batch_encode_plus once spacy-transformers is compatible with latest transformers
+        bert_input = {
+            'input_ids': torch.tensor(input_id_matrix)
+        }
+
         with torch.no_grad():
             bert_output = self.bert_lm(**bert_input)[0]
 
-        target_rows = torch.zeros(len(target_indices), self.bert_lm.config.vocab_size)
-        for index, target_index in enumerate(target_indices):
-            target_rows[index] = bert_output[index, target_index+1]  # +1 for CLS token
+        target_rows = torch.zeros(len(wordpiece_targets), self.bert_lm.config.vocab_size)
+        for index, target_index in enumerate(wordpiece_targets):
+            target_rows[index] = bert_output[index, target_index]
 
-        return tokens, target_indices, self.softmax(target_rows)
+        return doc, targets, self.softmax(target_rows)
 
     def print_sentence_analysis(self, sentence):
-        tokens, targets, probs = self.sentence_word_probs(sentence)
-        vocab = self.bert_tokenizer.get_vocab()
+        doc, targets, probs = self.sentence_word_probs(sentence)
         analysis = []
 
-        for target in targets:
-            original_token = tokens[target]
-            tokens_by_likelyhood = torch.argsort(probs[target], descending=True)
+        for index, target_tuple in enumerate(targets):
+            tok_target, wp_target = target_tuple
+            wp_token = doc._.trf_word_pieces_[wp_target]
+            original_token = doc[tok_target]
+
+            tokens_by_likelyhood = torch.argsort(probs[index], descending=True)
             top = tokens_by_likelyhood[0:20]
-            top_probs = torch.take(probs[target], top)
-            top_tokens = self.bert_tokenizer.convert_ids_to_tokens(top)
-            analysis.append(((original_token, probs[target][vocab[original_token]]),
+            top_probs = torch.take(probs[index], top)
+            top_tokens = [self.ids_to_tokens[id.item()] for id in top]
+            analysis.append(((original_token, wp_token, probs[index][self.vocab[wp_token]].item()),
                              [(top_probs[i].item(), top_tokens[i]) for i in range(len(top_tokens))]))
 
         self.printer.pprint(analysis)

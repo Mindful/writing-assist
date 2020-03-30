@@ -15,8 +15,6 @@ from lang8.example import Example
 #                                  'Haitian', 'Slavic')]
 
 
-
-
 def load_data(filename):
     with open(filename, 'r', encoding='utf8') as lang8_file:
         lines = lang8_file.readlines()

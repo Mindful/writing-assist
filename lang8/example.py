@@ -3,7 +3,7 @@ from lang8.parse import  english_nlp, MetaSpan
 from langdetect import detect_langs
 from difflib import SequenceMatcher
 from math import log2
-from languages import *
+from common import *
 
 parsers = {
     English: english_nlp()
@@ -27,16 +27,14 @@ class Example:
         self.corrections = [x for x in json_data[5] if x]  # discard empty corrections
 
     def __str__(self):
+        return str({attr: getattr(self, attr) for attr in self.__slots__})
+
+    def __repr__(self):
         return "<{} {}: {} -> {}>".format(self.__class__.__name__,
                                                self.journal_id, self.native_language,
                                                self.learning_languages)
 
-    def __repr__(self):
-        return self.__str__()
-
-
-
-    def process(self, sim_thresh = -0.2, sim_step = 0.2, sim_max = 0.85):
+    def process(self):
         if len(self.learning_languages) > 1:
             sentence_text = "\n".join(self.sentences)
             language_probabilities = detect_langs(sentence_text)
@@ -57,48 +55,76 @@ class Example:
         ]
 
         self.corrections = [
-            Correction([parse(sent) for sent in cor], self.sentences) for cor in self.corrections
+            CorrectionGroup([parse(sent) for sent in cor], self.sentences) for cor in self.corrections
         ]
 
-        for corr in self.corrections:
-            for aligned_corr in corr.aligned_corrections:
-                base_doc = self.sentences[aligned_corr[0]]
-                correction_similarity_threshold = min(sim_thresh + log2(len(base_doc)) * sim_step, sim_max)
-                if aligned_corr[3] < correction_similarity_threshold:
-                    continue
-
-                updates = []
-                for op in aligned_corr[1]:
-                    if op[0] == 'replace' or op[0] == 'insert':
-                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0], aligned_corr[2][op[3]:op[4]]))
-                    elif op[0] == 'delete':
-                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0]))
-
-
-                base_doc._.meta_spans = base_doc._.meta_spans + updates
+        self._write_corrections_to_meta_spans(self.corrections, self.sentences)
 
         return True
 
+    @staticmethod
+    def _write_corrections_to_meta_spans(corrections, sentences, sim_thresh=-0.2, sim_step=0.2, sim_max=0.85):
+        for corr in corrections:
+            for aligned_corr in corr.corrections:
+                base_doc = sentences[aligned_corr.alignment]
+                correction_similarity_threshold = Example._compute_similarity_threshold(base_doc, sim_thresh,
+                                                                                        sim_step, sim_max)
+                if aligned_corr.similarity_ratio < correction_similarity_threshold:
+                    continue
 
-class Correction:
-    __slots__ = ['aligned_corrections']
+                updates = []
+                for op in aligned_corr.comparison_ops:
+                    if op[0] == 'replace' or op[0] == 'insert':
+                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0], aligned_corr.correction[op[3]:op[4]]))
+                    elif op[0] == 'delete':
+                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0]))
+
+                base_doc._.meta_spans = base_doc._.meta_spans + updates
+
+    @staticmethod
+    def _compute_similarity_threshold(base_doc, sim_thresh, sim_step, sim_max):
+        return min(sim_thresh + log2(len(base_doc)) * sim_step, sim_max)
+
+
+class CorrectionGroup:
+    __slots__ = ['corrections']
 
     def __init__(self, correction_sentences, base_sentences):
-        self.aligned_corrections = []
+        self.corrections = []
         for corr in correction_sentences:
             alignment_gen = ((index, SequenceMatcher(None, [t.lower_ for t in base], [t.lower_ for t in corr]))
                              for index, base in enumerate(base_sentences)
-                             if index not in (x[0] for x in self.aligned_corrections))
+                             if index not in (x.alignment for x in self.corrections))
             alignments = [(x[0], x[1], x[1].ratio()) for x in alignment_gen]
             best_alignment = max(alignments, key=lambda x: x[2])
-            self.aligned_corrections.append((best_alignment[0], best_alignment[1].get_opcodes(), corr, best_alignment[2]))
+
+            self.corrections.append(Correction(best_alignment[0], corr, best_alignment[2], best_alignment[1].get_opcodes()))
 
     def __str__(self):
-        return '<{} for sentences {}>'.format(self.__class__.__name__, ','.join(str(x[0]) for x in self.aligned_corrections))
+        return str(self.corrections)
 
+    def __getitem__(self, item):
+        return self.corrections[item]
 
     def __repr__(self):
-        return self.__str__()
+        return '<{} for sentences {}, {} corrections>'.format(self.__class__.__name__,
+                                                              '&'.join(str(x.alignment) for x in self.corrections),
+                                                              len(self.corrections))
+
+    def __len__(self):
+        return len(self.corrections)
+
+
+class Correction(SlotPrinter):
+    __slots__ = ['alignment', 'correction', 'similarity_ratio', 'comparison_ops']
+
+    def __init__(self, alignment, correction, similarity_ratio, comparison_ops):
+        self.alignment = alignment
+        self.correction = correction
+        self.similarity_ratio = similarity_ratio
+        self.comparison_ops = comparison_ops
+
+
 
 
 

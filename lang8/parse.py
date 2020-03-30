@@ -2,6 +2,7 @@ import spacy
 import re
 import itertools
 from spacy.tokens import Doc
+from common import SlotPrinter
 
 
 operation_markers = {
@@ -11,22 +12,13 @@ operation_markers = {
 }
 
 
-class MetaSpan:
+class MetaSpan(SlotPrinter):
     __slots__ = ['span', 'type', 'content']
 
     def __init__(self, span, type, content=None):
         self.span = span
         self.type = type
         self.content = content
-
-    def __str__(self):
-        if self.content is None:
-            return '({}, {})'.format(self.span, self.type)
-        else:
-            return '({}, {}, {})'.format(self.span, self.type, self.content)
-
-    def __repr__(self):
-        return self.__str__()
 
     def __eq__(self, other):
         return isinstance(other, MetaSpan) and self.type == other.type and self.span.text == other.span.text \

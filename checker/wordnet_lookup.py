@@ -1,5 +1,5 @@
 from nltk.corpus import wordnet as wn
-from languages import *
+from common import *
 
 wordnet_by_language = {
     English: 'eng',

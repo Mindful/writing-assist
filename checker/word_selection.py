@@ -1,12 +1,11 @@
 from transformers import AutoModelWithLMHead
 from torch import nn
 import torch
-import torch
-import string
 import pprint
 import spacy
 from spacy_transformers import TransformersLanguage, TransformersWordPiecer
 from checker import parts_of_speech
+from checker.wordnet_lookup import *
 
 
 class BertWordModel:
@@ -21,6 +20,10 @@ class BertWordModel:
         self.vocab = wp.model.vocab
         self.mask_token_id = self.vocab[wp.model._mask_token]
         self.ids_to_tokens = wp.model.ids_to_tokens
+
+    def word_probs(self, words, probs):
+        return sorted(((word, probs[self.vocab[word]].item()) for word in words if word in self.vocab),
+                      key=lambda x: x[1], reverse=True)
 
 
     def __init__(self, bert_model):
@@ -53,7 +56,7 @@ class BertWordModel:
 
         return doc, targets, self.softmax(target_rows)
 
-    def print_sentence_analysis(self, sentence):
+    def print_sentence_analysis(self, sentence, base_language, target_langage):
         doc, targets, probs = self.sentence_word_probs(sentence)
         analysis = []
 
@@ -66,8 +69,16 @@ class BertWordModel:
             top = tokens_by_likelyhood[0:20]
             top_probs = torch.take(probs[index], top)
             top_tokens = [self.ids_to_tokens[id.item()] for id in top]
-            analysis.append(((original_token, wp_token, probs[index][self.vocab[wp_token]].item()),
-                             [(top_probs[i].item(), top_tokens[i]) for i in range(len(top_tokens))]))
+            token_analysis = {
+                'original_token': original_token,
+                'wordpiece_token': wp_token,
+                'token_prob': probs[index][self.vocab[wp_token]].item(),
+                'top_probs': [(top_tokens[i], top_probs[i].item()) for i in range(len(top_tokens))],
+                'twohop_probs': self.word_probs(token_candidates(English, Japanese, original_token), probs[index])
+
+
+            }
+            analysis.append(token_analysis)
 
         self.printer.pprint(analysis)
 

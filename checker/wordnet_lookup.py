@@ -9,7 +9,7 @@ wordnet_by_language = {
 }
 
 
-def onehop_lemmas_with_synset(language, target_language, word):
+def twohop_lemmas_with_synset(language, target_language, word):
     language = wordnet_by_language[language]
     target_language = wordnet_by_language[target_language]
     # what the word can mean in base langauge
@@ -22,7 +22,7 @@ def onehop_lemmas_with_synset(language, target_language, word):
     hop_synsets = {synset for lemma in hop_lemmas for synset in wn.synsets(lemma.name(), lang=target_language)}
 
     # how they can be expressed in base language
-    onehop_results= [(lemma, synset) for synset in hop_synsets for lemma in synset.lemmas(lang=language)]
+    onehop_results = [(lemma, synset) for synset in hop_synsets for lemma in synset.lemmas(lang=language)]
 
     onehop_lemmas = {x[0]: [] for x in onehop_results}
     for lemma, synset in onehop_results:
@@ -30,8 +30,13 @@ def onehop_lemmas_with_synset(language, target_language, word):
 
     return onehop_lemmas
 
-def onehop_lemmas(language, target_language, word):
-    return list(onehop_lemmas_with_synset(language, target_language, word).keys())
+
+def token_candidates(language, target_language, token):
+    target_pos = parts_of_speech[token.pos]
+    twohop_lemma_map = twohop_lemmas_with_synset(language, target_language, token.text)
+    candidate_names = [lemma.name() for lemma, synset_list in twohop_lemma_map.items()
+                       if synset_list[0].pos() in target_pos]
+    return candidate_names
 
 
 

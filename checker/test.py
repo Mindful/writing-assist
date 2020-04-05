@@ -3,14 +3,13 @@ from checker.word_selection import *
 
 
 def main():
+    s = 'The comedy was so interesting!'
     bwm = BertWordModel('distilbert-base-uncased')
-    onehop_lemmas(English, Japanese, 'cat')
-    doc, target_indices, probabilities = bwm.sentence_word_probs('The comedy was so interesting!')
+    doc, target_indices, probabilities = bwm.sentence_word_probs(s)
 
-    token = doc[1]
-    candidates = onehop_lemmas(English, Japanese, token.text)
+    bwm.print_sentence_analysis(s)
 
-    bwm.print_sentence_analysis('The comedy was so interesting!')
+
 
 
 

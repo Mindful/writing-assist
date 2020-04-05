@@ -12,10 +12,6 @@ def main():
         [onlp(cor_sent) for cor_sent in x] for x in learning_english[0].correction_groups
     ]
 
-
-    print('wiggity')
-
-
     #final_data = [ex for ex in learning_english if ex.process()]
 
 

@@ -115,6 +115,6 @@ class CorrectionTokenizer:
 
 
 def english_nlp(enact=False):
-    nlp = spacy.load("en_core_web_sm", disable=["tagger", "parser", "ner"])
+    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
     nlp.tokenizer = CorrectionTokenizer(nlp.tokenizer, enact)
     return nlp

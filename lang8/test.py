@@ -1,5 +1,6 @@
 from lang8 import load, parse, example
 import unittest
+import re
 
 
 class MockSpacySpan:
@@ -20,7 +21,7 @@ def compute_correction_result(original_doc,  correction):
 
         doc_correction = next(cor_span for cor_span in original_doc._.meta_spans if cor_span.type == op_type
              and cor_span.span.start == op[1] and cor_span.span.end == op[2] and (cor_span.type == 'delete' or
-                cor_span.content.lower_ == correction.correction[op[3]:op[4]].lower_))
+                cor_span.content.lower_ == correction.doc[op[3]:op[4]].lower_))
 
         if doc_correction.type == 'replace' or doc_correction.type == 'insert':
             tokens[doc_correction.span.start:doc_correction.span.end] = [t.lower_ for t in doc_correction.content]
@@ -31,15 +32,15 @@ def compute_correction_result(original_doc,  correction):
 
 
 
-
-
-
-
-
-
-
 class Lang8(unittest.TestCase):
     nlp = parse.english_nlp()
+    opinionated_nlp = parse.english_nlp(True)
+
+    deletion_span_markers = [re.escape(m) + r'.*' + re.escape(m[0:1] + '/' + m[1:]) for m in parse.deletion_markers]
+
+    retention_op_markers = [re.escape(x) for x in parse.retention_markers] + [re.escape(x) for x in [parse.operation_markers[m] for m in parse.retention_markers]]
+
+    opinionated_deletion_regex = re.compile('(' + '|'.join(op for op in deletion_span_markers + retention_op_markers) + ')')
 
     def verify_corrections(self, sentences, correction_groups):
         example.Example._write_corrections_to_meta_spans(correction_groups, sentences,
@@ -55,7 +56,7 @@ class Lang8(unittest.TestCase):
                                                                            sim_thresh=-0.2, sim_step=0.2, sim_max=0.85)
 
                     if correction.similarity_ratio >= thresh:
-                        target = [t.lower_ for t in correction.correction]
+                        target = [t.lower_ for t in correction.doc]
                         result = compute_correction_result(sentence_doc, correction)
                         self.assertEqual(target, result)
                         done_corrections += 1
@@ -63,6 +64,27 @@ class Lang8(unittest.TestCase):
         self.assertEqual(seen_corrections, done_corrections)
 
 
+    def test_enacting_correction_parsing(self):
+        str1 = "So, as the winter is coming, I'm [f-blue] really starting [/f-blue] to feel [f-red]better [/f-red]."
+        str2 = "I like big dogs."
+        str3 = "Will you buy me a [sline]small[/sline] dog?"
+        str4 = "'I w[f-blue]ould[/f-blue] appreciate it if you [f-blue]could [/f-blue]correct my sentences.'"
+        doc1 = Lang8.opinionated_nlp(str1)
+        doc2 = Lang8.opinionated_nlp(str2)
+        doc3 = Lang8.opinionated_nlp(str3)
+        doc4 = Lang8.opinionated_nlp(str4)
+
+
+        self.assertEqual(doc1.text, Lang8.opinionated_deletion_regex.sub('', str1))
+        self.assertEqual(doc2.text, Lang8.opinionated_deletion_regex.sub('', str2))
+        self.assertEqual(doc3.text, Lang8.opinionated_deletion_regex.sub('', str3))
+        self.assertEqual(doc4.text, Lang8.opinionated_deletion_regex.sub('', str4))
+
+        self.assertEqual(doc1._.meta_spans, [mock_meta_span('really starting', '[f-blue]'),
+                                             mock_meta_span('', '[f-red]', 'better ')])
+        self.assertEqual(doc2._.meta_spans, [])
+        self.assertEqual(doc3._.meta_spans, [mock_meta_span('', '[sline]', 'small')])
+        self.assertEqual(doc4._.meta_spans, [mock_meta_span('would', '[f-blue]'), mock_meta_span('could', '[f-blue]')])
 
 
     def test_correction_span_parsing(self):

@@ -35,30 +35,33 @@ class Example:
                                                self.learning_languages)
 
     def process(self):
-        if len(self.learning_languages) > 1:
-            sentence_text = "\n".join(self.sentences)
-            language_probabilities = detect_langs(sentence_text)
-            iso = max(language_probabilities, key=lambda x: x.prob).lang
-            if iso not in language_by_iso:
+        try:
+            if len(self.learning_languages) > 1:
+                sentence_text = "\n".join(self.sentences)
+                language_probabilities = detect_langs(sentence_text)
+                iso = max(language_probabilities, key=lambda x: x.prob).lang
+                if iso not in language_by_iso:
+                    return False
+                language = language_by_iso[iso]
+            else:
+                language = self.learning_languages[0]
+
+            if language not in parsers:
                 return False
-            language = language_by_iso[iso]
-        else:
-            language = self.learning_languages[0]
 
-        if language not in parsers:
+            parse = parsers[language]
+
+            self.sentences = [
+                parse(sent) for sent in self.sentences
+            ]
+
+            self.correction_groups = [
+                CorrectionGroup([parse(sent) for sent in cor], self.sentences) for cor in self.correction_groups
+            ]
+
+            self._write_corrections_to_meta_spans(self.correction_groups, self.sentences)
+        except Exception:
             return False
-
-        parse = parsers[language]
-
-        self.sentences = [
-            parse(sent) for sent in self.sentences
-        ]
-
-        self.correction_groups = [
-            CorrectionGroup([parse(sent) for sent in cor], self.sentences) for cor in self.correction_groups
-        ]
-
-        self._write_corrections_to_meta_spans(self.correction_groups, self.sentences)
 
         return True
 

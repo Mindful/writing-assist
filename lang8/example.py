@@ -1,5 +1,6 @@
 import json
 from lang8.parse import  english_nlp, MetaSpan
+from lang8.language_tool_api import check
 from langdetect import detect_langs
 from difflib import SequenceMatcher
 from math import log2
@@ -90,10 +91,11 @@ class Example:
 
 
 class CorrectionGroup:
-    __slots__ = ['corrections']
+    __slots__ = ['corrections', 'grammatical_corrections']
 
     def __init__(self, correction_sentences, base_sentences):
         self.corrections = []
+        self.grammatical_corrections = []
         for corr in correction_sentences:
             alignment_gen = ((index, SequenceMatcher(None, [t.lower_ for t in base], [t.lower_ for t in corr]))
                              for index, base in enumerate(base_sentences)
@@ -117,6 +119,17 @@ class CorrectionGroup:
     def __len__(self):
         return len(self.corrections)
 
+    def grammar_check_corrections(self):
+        try:
+            self.grammatical_corrections = [
+                corr for corr in self.corrections
+                if not check(corr.doc.text)['matches']
+            ]
+
+        except Exception:
+            return False
+
+        return True
 
 
 class Correction(SlotPrinter):

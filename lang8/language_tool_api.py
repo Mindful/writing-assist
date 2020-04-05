@@ -6,10 +6,10 @@ import requests
 import pprint
 
 def check(input_text, lang='en-US', mother_tongue=None, preferred_variants=None,
-          enabled_rules=None, disabled_rules=None,
+          enabled_rules=None, disabled_rules='EN_COMPOUNDS,TYPOS', #removing 'TYPOS' dramatically increases the mistakes
           enabled_categories=None, 
           disabled_categories='CASING,TYPOGRAPHY,EN_QUOTES,PUNCTUATION',
-          enabled_only=False, ignore_list=None,
+          enabled_only='false', ignore_list=None,
           **kwargs):
     """
     Check given text and return API response as a dictionary.
@@ -67,35 +67,35 @@ def check(input_text, lang='en-US', mother_tongue=None, preferred_variants=None,
             The most notable key is ``matches``, which contains a list of all
             spelling mistakes that have been found.
     """
+    
     post_parameters = {
         "text": input_text,
         "language": lang,
+        "motherTongue": mother_tongue,
+        "preferredVariants": preferred_variants,
+        "enabledRules": enabled_rules,
+        "disabledRules": disabled_rules,
+        "enabledCategories": enabled_categories,
+        "disabledCategories": disabled_categories,
+        "enabledOnly": enabled_only
     }
-    if mother_tongue:
-        post_parameters["motherTongue"] = mother_tongue
-    if preferred_variants:
-        post_parameters["preferredVariants"] = preferred_variants
-    if enabled_rules:
-        post_parameters["enabledRules"] = enabled_rules
-    if disabled_rules:
-        post_parameters["disabledRules"] = disabled_rules
-    if enabled_categories:
-        post_parameters["enabledCategories"] = enabled_categories
-    if disabled_categories:
-        post_parameters["disabledCategories"] = disabled_categories
-    if enabled_only:
-        post_parameters["enabledOnly"] = 'true'
 
-    r = requests.post("https://languagetool.org/api/v2/check", data=post_parameters)
-    if r.status_code != 200:
-        raise ValueError(r.text)
-    data = r.json()
+    post_parameters = {k: v for k, v in post_parameters.items() if v}
+    resp = requests.post("https://languagetool.org/api/v2/check", data=post_parameters)
+
+    if resp.status_code != 200:
+        raise ValueError(resp.text)
+
+    data = resp.json()
     if ignore_list:
         matches = data.pop('matches', [])
         data['matches'] = [
             match for match in matches 
             if not _is_in_ignore_list(match, ignore_list)
         ]
+    # To print error matches
+    # if data['matches']:
+    #     pprint.pprint(data)
     return data
 
 def _is_in_ignore_list(match, ignore_list):

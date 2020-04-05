@@ -3,15 +3,6 @@ import unittest
 import re
 
 
-class MockSpacySpan:
-    def __init__(self, text):
-        self.text = text
-
-
-def mock_meta_span(text, type, content=None):
-    return parse.MetaSpan(MockSpacySpan(text), type, content)
-
-
 def compute_correction_result(original_doc,  correction):
     tokens = [t.lower_ for t in original_doc]
     for op in correction.comparison_ops:
@@ -20,15 +11,33 @@ def compute_correction_result(original_doc,  correction):
             continue
 
         doc_correction = next(cor_span for cor_span in original_doc._.meta_spans if cor_span.type == op_type
-             and cor_span.span.start == op[1] and cor_span.span.end == op[2] and (cor_span.type == 'delete' or
+             and cor_span.start == op[1] and cor_span.end == op[2] and (cor_span.type == 'delete' or
                 cor_span.content.lower_ == correction.doc[op[3]:op[4]].lower_))
 
         if doc_correction.type == 'replace' or doc_correction.type == 'insert':
-            tokens[doc_correction.span.start:doc_correction.span.end] = [t.lower_ for t in doc_correction.content]
+            tokens[doc_correction.start:doc_correction.end] = [t.lower_ for t in doc_correction.content]
         elif doc_correction.type == 'delete':
-            tokens[doc_correction.span.start:doc_correction.span.end] = []
+            tokens[doc_correction.start:doc_correction.end] = []
 
     return tokens
+
+class SpanContents:
+    def __init__(self, text, type, content=None):
+        self.text = text
+        self.type = type
+        self.content = content
+
+    def __eq__(self, other):
+        return self.text == other.text and self.type == other.type and self.content == other.content
+
+    def __repr__(self):
+        return self.__dict__.__repr__()
+
+def doc_span_contents(doc):
+    return [SpanContents(doc[meta_span.start:meta_span.end].text, meta_span.type, meta_span.content) for meta_span
+     in doc._.meta_spans]
+
+
 
 
 
@@ -80,11 +89,11 @@ class Lang8(unittest.TestCase):
         self.assertEqual(doc3.text, Lang8.opinionated_deletion_regex.sub('', str3))
         self.assertEqual(doc4.text, Lang8.opinionated_deletion_regex.sub('', str4))
 
-        self.assertEqual(doc1._.meta_spans, [mock_meta_span('really starting', '[f-blue]'),
-                                             mock_meta_span('', '[f-red]', 'better ')])
-        self.assertEqual(doc2._.meta_spans, [])
-        self.assertEqual(doc3._.meta_spans, [mock_meta_span('', '[sline]', 'small')])
-        self.assertEqual(doc4._.meta_spans, [mock_meta_span('would', '[f-blue]'), mock_meta_span('could', '[f-blue]')])
+        self.assertEqual(doc_span_contents(doc1), [SpanContents('really starting', '[f-blue]'),
+                                             SpanContents('', '[f-red]', 'better ')])
+        self.assertEqual(doc_span_contents(doc2), [])
+        self.assertEqual(doc_span_contents(doc3), [SpanContents('', '[sline]', 'small')])
+        self.assertEqual(doc_span_contents(doc4), [SpanContents('would', '[f-blue]'), SpanContents('could', '[f-blue]')])
 
 
     def test_correction_span_parsing(self):
@@ -102,10 +111,10 @@ class Lang8(unittest.TestCase):
         self.assertEqual(doc3.text, parse.operations_regex.sub('', str3))
         self.assertEqual(doc4.text, parse.operations_regex.sub('', str4))
 
-        self.assertEqual(doc1._.meta_spans, [mock_meta_span('really starting', '[f-blue]'), mock_meta_span('better', '[f-red]')])
-        self.assertEqual(doc2._.meta_spans, [])
-        self.assertEqual(doc3._.meta_spans, [mock_meta_span('small', '[sline]')])
-        self.assertEqual(doc4._.meta_spans, [mock_meta_span('would', '[f-blue]'), mock_meta_span('could', '[f-blue]')])
+        self.assertEqual(doc_span_contents(doc1), [SpanContents('really starting', '[f-blue]'), SpanContents('better', '[f-red]')])
+        self.assertEqual(doc_span_contents(doc2), [])
+        self.assertEqual(doc_span_contents(doc3), [SpanContents('small', '[sline]')])
+        self.assertEqual(doc_span_contents(doc4), [SpanContents('would', '[f-blue]'), SpanContents('could', '[f-blue]')])
 
 
     def test_correction_object_construction(self):

@@ -12,16 +12,17 @@ operation_markers = {m: m[0:1] + '/' + m[1:] for m in markers}
 
 
 class MetaSpan(SlotPrinter):
-    __slots__ = ['span', 'type', 'content']
+    __slots__ = ['start', 'end', 'type', 'content']
 
-    def __init__(self, span, type, content=None):
-        self.span = span
+    def __init__(self, start, end, type, content=None):
+        self.start = start
+        self.end = end
         self.type = type
         self.content = content
 
     def __eq__(self, other):
-        return isinstance(other, MetaSpan) and self.type == other.type and self.span.text == other.span.text \
-               and self.content == other.content
+        return isinstance(other, MetaSpan) and self.type == other.type and self.start == other.start \
+               and self.end == other.end and self.content == other.content
 
 
 operations_list = list(operation_markers.keys()) + list(operation_markers.values())
@@ -69,7 +70,7 @@ class CorrectionTokenizer:
                 offset += len(inner_text)
                 string_pieces.append(previous_text)
                 correction_end = correction_start
-                content = inner_text
+                content = inner_text.as_doc()
             else:
                 content = None
                 string_pieces.extend([previous_text, inner_text])
@@ -102,11 +103,11 @@ class CorrectionTokenizer:
                 if char_location > cor[1] and char_location > cor[2]:
                     break
 
-            span = doc.char_span(start, end)
-            if cor[1] == cor[2]: # it's a deletion marker, we only need a deletion location
-                span = doc[span.start:span.start]
-
-            doc_corrections.append(MetaSpan(span, cor[0], cor[3]))
+            charspan = doc.char_span(start, end)
+            if cor[1] == cor[2]:  # it's a deletion marker, we only need a deletion location
+                doc_corrections.append(MetaSpan(charspan.start, charspan.start, cor[0], cor[3]))
+            else:
+                doc_corrections.append(MetaSpan(charspan.start, charspan.end, cor[0], cor[3]))
 
         doc._.meta_spans = doc_corrections
         return doc

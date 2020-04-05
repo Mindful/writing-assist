@@ -4,6 +4,7 @@ from checker.word_selection import *
 
 def main():
     bwm = BertWordModel('distilbert-base-uncased')
+    onehop_lemmas(English, Japanese, 'cat')
     doc, target_indices, probabilities = bwm.sentence_word_probs('The comedy was so interesting!')
 
     token = doc[1]

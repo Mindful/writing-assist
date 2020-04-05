@@ -16,7 +16,7 @@ language_by_iso = {
 
 class Example:
     # https://sites.google.com/site/naistlang8corpora/home/readme-raw
-    __slots__ = ['journal_id', 'learning_languages', 'native_language', 'sentences', 'corrections']
+    __slots__ = ['journal_id', 'learning_languages', 'native_language', 'sentences', 'correction_groups']
 
     def __init__(self, raw_data):
         json_data = json.loads(raw_data, strict=False)
@@ -24,7 +24,7 @@ class Example:
         self.learning_languages = [x.strip() for x in json_data[2].split(',')]
         self.native_language = json_data[3]
         self.sentences = json_data[4]
-        self.corrections = [x for x in json_data[5] if x]  # discard empty corrections
+        self.correction_groups = [x for x in json_data[5] if x]  # discard empty corrections
 
     def __str__(self):
         return str({attr: getattr(self, attr) for attr in self.__slots__})
@@ -54,11 +54,11 @@ class Example:
             parse(sent) for sent in self.sentences
         ]
 
-        self.corrections = [
-            CorrectionGroup([parse(sent) for sent in cor], self.sentences) for cor in self.corrections
+        self.correction_groups = [
+            CorrectionGroup([parse(sent) for sent in cor], self.sentences) for cor in self.correction_groups
         ]
 
-        self._write_corrections_to_meta_spans(self.corrections, self.sentences)
+        self._write_corrections_to_meta_spans(self.correction_groups, self.sentences)
 
         return True
 
@@ -75,7 +75,7 @@ class Example:
                 updates = []
                 for op in aligned_corr.comparison_ops:
                     if op[0] == 'replace' or op[0] == 'insert':
-                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0], aligned_corr.correction[op[3]:op[4]]))
+                        updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0], aligned_corr.doc[op[3]:op[4]]))
                     elif op[0] == 'delete':
                         updates.append(MetaSpan(base_doc[op[1]:op[2]], op[0]))
 
@@ -115,14 +115,17 @@ class CorrectionGroup:
         return len(self.corrections)
 
 
+
 class Correction(SlotPrinter):
-    __slots__ = ['alignment', 'correction', 'similarity_ratio', 'comparison_ops']
+    __slots__ = ['alignment', 'doc', 'similarity_ratio', 'comparison_ops']
 
     def __init__(self, alignment, correction, similarity_ratio, comparison_ops):
         self.alignment = alignment
-        self.correction = correction
+        self.doc = correction
         self.similarity_ratio = similarity_ratio
         self.comparison_ops = comparison_ops
+
+
 
 
 

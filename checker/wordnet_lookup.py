@@ -34,8 +34,8 @@ def twohop_lemmas_with_synset(language, target_language, word):
 def token_candidates(language, target_language, token):
     target_pos = parts_of_speech[token.pos]
     twohop_lemma_map = twohop_lemmas_with_synset(language, target_language, token.text)
-    candidate_names = [lemma.name() for lemma, synset_list in twohop_lemma_map.items()
-                       if synset_list[0].pos() in target_pos]
+    candidate_names = {lemma.name() for lemma, synset_list in twohop_lemma_map.items()
+                       if synset_list[0].pos() in target_pos}
     return candidate_names
 
 

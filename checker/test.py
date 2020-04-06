@@ -1,13 +1,10 @@
-from checker.wordnet_lookup import *
 from checker.word_selection import *
 
 
 def main():
-    s = 'The comedy was so interesting!'
     bwm = BertWordModel('distilbert-base-uncased')
-    doc, target_indices, probabilities = bwm.sentence_word_probs(s)
-
-    bwm.print_sentence_analysis(s)
+    bwm.suggestions('The comedy was so interesting!', English, Japanese)
+    bwm.print_sentence_analysis('The comedy was so interesting!', English, Japanese)
 
 
 

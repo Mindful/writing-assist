@@ -4,8 +4,27 @@ import torch
 import pprint
 import spacy
 from spacy_transformers import TransformersLanguage, TransformersWordPiecer
-from checker import parts_of_speech
+from scipy import stats
+import numpy as np
 from checker.wordnet_lookup import *
+
+
+class Suggestion:
+    def __init__(self, token, considerations, candidates):
+        self.original_word = token.text
+        self.considerations = considerations
+        self.candidates = candidates
+
+    def orignal_prob(self):
+        return self.considerations[self.original_word]
+
+    def __repr__(self):
+        dict_repr = {
+            'original_word': self.original_word,
+            'original_prob': self.orignal_prob(),
+            'candidates': self.candidates
+        }
+        return '<' + self.__class__.__name__ + dict_repr.__repr__() + '>'
 
 
 class BertWordModel:
@@ -21,6 +40,7 @@ class BertWordModel:
         self.mask_token_id = self.vocab[wp.model._mask_token]
         self.ids_to_tokens = wp.model.ids_to_tokens
 
+
     def word_probs(self, words, probs):
         return sorted(((word, probs[self.vocab[word]].item()) for word in words if word in self.vocab),
                       key=lambda x: x[1], reverse=True)
@@ -29,7 +49,7 @@ class BertWordModel:
     def __init__(self, bert_model):
         self.bert_lm = AutoModelWithLMHead.from_pretrained(bert_model)
         self.set_english_parser(bert_model)
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=0)
         self.printer = pp = pprint.PrettyPrinter()
 
     def sentence_word_probs(self, sentence):
@@ -54,10 +74,54 @@ class BertWordModel:
         for index, target_index in enumerate(wordpiece_targets):
             target_rows[index] = bert_output[index, target_index]
 
-        return doc, targets, self.softmax(target_rows)
+        return doc, targets, target_rows
+
+
+    def suggestions(self, sentence, base_language, target_language):
+        doc, targets, weights = self.sentence_word_probs(sentence)
+        suggestions = []
+
+        for index, target_tuple in enumerate(targets):
+            tok_target, wp_target = target_tuple
+            wp_token = doc._.trf_word_pieces_[wp_target]
+            original_token = doc[tok_target]
+            consideration_count = int(0.01 * self.bert_lm.config.vocab_size)
+
+            weight_sort_indices = torch.argsort(weights[index], descending=True)
+            considerations = weight_sort_indices[0:consideration_count]
+            with torch.no_grad():
+                softmaxed_candidates = self.softmax(torch.take(weights[index], considerations))
+
+            consideration_probs = {
+                self.ids_to_tokens[considerations[index].item()]: softmaxed_candidates[index].item()
+                for index in range(considerations.shape[0])
+            }
+
+            # if original token isn't in BERT's top 1%, probably not going to get useful results
+            if original_token.text in consideration_probs:
+                original_prob = consideration_probs[original_token.text]
+                twohop_lemmas = token_candidates(base_language, target_language, original_token)
+                candidates = {
+                    lemma: consideration_probs[lemma] for lemma in twohop_lemmas
+                    if lemma in consideration_probs and consideration_probs[lemma] / original_prob > 0.1 # MAGIC NUMBER ALERT
+                    # candidates are at least one order of magnitude more likely
+                }
+
+                skew = stats.skew(np.array(list(consideration_probs.values())))
+                if skew > 1: # MAGIC NUMBER ALERT
+                    best_candidate = max(candidates.items(), key=lambda x: x[1])
+                    final_candidates = dict(candidate_tuple for candidate_tuple in candidates.items()
+                                  if candidate_tuple[1] >= best_candidate[1] * 0.8)
+
+                    suggestions.append(Suggestion(original_token, consideration_probs, final_candidates))
+
+        return suggestions
+
+
 
     def print_sentence_analysis(self, sentence, base_language, target_langage):
-        doc, targets, probs = self.sentence_word_probs(sentence)
+        doc, targets, weights = self.sentence_word_probs(sentence)
+        probs = torch.nn.Softmax(dim=1)(weights)
         analysis = []
 
         for index, target_tuple in enumerate(targets):
@@ -65,9 +129,11 @@ class BertWordModel:
             wp_token = doc._.trf_word_pieces_[wp_target]
             original_token = doc[tok_target]
 
+
             tokens_by_likelyhood = torch.argsort(probs[index], descending=True)
             top = tokens_by_likelyhood[0:20]
             top_probs = torch.take(probs[index], top)
+
             top_tokens = [self.ids_to_tokens[id.item()] for id in top]
             token_analysis = {
                 'original_token': original_token,
@@ -85,10 +151,6 @@ class BertWordModel:
     def batch_word_probs(self, text):
         pass
 
-
-def main():
-    bwm = BertWordModel('distilbert-base-uncased')
-    bwm.print_sentence_analysis('I love dogs so much.')
 
 
 

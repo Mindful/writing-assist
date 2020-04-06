@@ -7,13 +7,15 @@ from spacy_transformers import TransformersLanguage, TransformersWordPiecer
 from scipy import stats
 import numpy as np
 from checker.wordnet_lookup import *
+from checker.morphology import *
 
 
 class Suggestion:
-    def __init__(self, token, considerations, candidates):
+    def __init__(self, token, considerations, candidates, suggeston_words):
         self.original_word = token.text
         self.considerations = considerations
         self.candidates = candidates
+        self.suggestion_words = suggeston_words
 
     def orignal_prob(self):
         return self.considerations[self.original_word]
@@ -22,7 +24,7 @@ class Suggestion:
         dict_repr = {
             'original_word': self.original_word,
             'original_prob': self.orignal_prob(),
-            'candidates': self.candidates
+            'suggestion_words': self.suggestion_words
         }
         return '<' + self.__class__.__name__ + dict_repr.__repr__() + '>'
 
@@ -101,6 +103,14 @@ class BertWordModel:
             if original_token.text in consideration_probs:
                 original_prob = consideration_probs[original_token.text]
                 twohop_lemmas = token_candidates(base_language, target_language, original_token)
+                if original_token.pos == VERB:
+                    # if it's a verb, make sure we keep the tense
+                    tense = best_verb_tense(original_token.text)
+                    if tense is None:
+                        print('warning: skipping becuase verb tense is none for', original_token.text) #TODO: logging?
+                        continue
+                    twohop_lemmas = (verb_to_tense(lemma, tense) for lemma in twohop_lemmas)
+
                 candidates = {
                     lemma: consideration_probs[lemma] for lemma in twohop_lemmas
                     if lemma in consideration_probs and consideration_probs[lemma] / original_prob > 0.1 # MAGIC NUMBER ALERT
@@ -110,10 +120,10 @@ class BertWordModel:
                 skew = stats.skew(np.array(list(consideration_probs.values())))
                 if skew > 1: # MAGIC NUMBER ALERT
                     best_candidate = max(candidates.items(), key=lambda x: x[1])
-                    final_candidates = dict(candidate_tuple for candidate_tuple in candidates.items()
+                    suggestion_words = dict(candidate_tuple for candidate_tuple in candidates.items()
                                   if candidate_tuple[1] >= best_candidate[1] * 0.8)
 
-                    suggestions.append(Suggestion(original_token, consideration_probs, final_candidates))
+                    suggestions.append(Suggestion(original_token, consideration_probs, candidates, suggestion_words))
 
         return suggestions
 

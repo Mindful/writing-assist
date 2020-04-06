@@ -4,3 +4,4 @@ langdetect>=1.0
 torch>=1.4.0
 transformers>=2.0.0
 scipy>=1.4.0
+pattern>=3.6

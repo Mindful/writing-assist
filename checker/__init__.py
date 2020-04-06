@@ -1,6 +1,8 @@
 from nltk.corpus import wordnet as wn
 from spacy import symbols as sp
 
+VERB = sp.VERB
+
 parts_of_speech = {
     sp.VERB: {wn.VERB},
     sp.ADJ: {wn.ADJ, wn.ADJ_SAT},
